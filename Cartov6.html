@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Demo: Store Locator with Mapbox and Airtable</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+  <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    body {
+      color: #404040;
+      font: 400 15px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .sidebar {
+      position: absolute;
+      width: 33.3333%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      overflow: hidden;
+      border-right: 1px solid rgba(0, 0, 0, 0.25);
+    }
+
+    .map {
+      position: absolute;
+      left: 33.3333%;
+      width: 66.6666%;
+      top: 0;
+      bottom: 0;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0;
+      font-weight: 400;
+      line-height: 20px;
+      padding: 20px 2px;
+    }
+
+    a {
+      color: #404040;
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: #101010;
+    }
+
+    .heading {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      min-height: 60px;
+      line-height: 60px;
+      padding: 0 10px;
+      background-color: #00853e;
+      color: #fff;
+    }
+
+    .listings {
+      height: 100%;
+      overflow: auto;
+      padding-bottom: 60px;
+    }
+
+    .listings .item {
+      display: block;
+      border-bottom: 1px solid #eee;
+      padding: 10px;
+      text-decoration: none;
+    }
+
+    .listings .item:last-child {
+      border-bottom: none;
+    }
+
+    .listings .item .title {
+      display: block;
+      color: #00853e;
+      font-weight: 700;
+    }
+
+    .listings .item .title small {
+      font-weight: 400;
+    }
+
+    .listings .item.active .title,
+    .listings .item .title:hover {
+      color: #8cc63f;
+    }
+
+    .listings .item.active {
+      background-color: #f8f8f8;
+    }
+
+    ::-webkit-scrollbar {
+      width: 3px;
+      height: 3px;
+      border-left: 0;
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    ::-webkit-scrollbar-track {
+      background: none;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #00853e;
+      border-radius: 0;
+    }
+
+    .marker {
+      border: none;
+      cursor: pointer;
+      height: 24px;
+      width: 24px;
+
+      /* Use flexbox to center the SVG icon */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Marker tweaks */
+    .mapboxgl-popup {
+      padding-bottom: 50px;
+    }
+
+    .mapboxgl-popup-close-button {
+      display: none;
+    }
+
+    .mapboxgl-popup-content {
+      font: 400 15px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+      padding: 0;
+      width: 180px;
+    }
+
+    .mapboxgl-popup-content h3 {
+      background: #91c949;
+      color: #fff;
+      margin: 0;
+      padding: 10px;
+      border-radius: 3px 3px 0 0;
+      font-weight: 700;
+      margin-top: -15px;
+    }
+
+    .mapboxgl-popup-content p {
+    margin-left: 10px;
+    margin-right: 10px;
+    font-size: 12px;
+    }
+
+    .mapboxgl-popup-content h4 {
+      margin: 5px;
+      padding: 10px;
+      font-weight: 400;
+    }
+
+    .mapboxgl-popup-content div {
+      margin: 5px;
+      padding: 10px;
+    }
+
+    .mapboxgl-popup-anchor-top > .mapboxgl-popup-content {
+      margin-top: 15px;
+    }
+
+    .mapboxgl-popup-anchor-top > .mapboxgl-popup-tip {
+      border-bottom-color: #91c949;
+    }
+ </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="heading">
+          <h1>Visited Spaces</h1></div>
+          <p id="locationCount">Loading...</p> <!-- Ajout de cet élément -->
+
+          <div>
+            <!-- Ajouter un sélecteur pour permettre aux utilisateurs de choisir le pays -->
+            <label for="filterByCountry">Filter by Country:</label>
+            <select id="filterByCountry">
+              <option value="">All Countries</option>
+              <!-- Ajouter les options pour chaque pays unique dans les données -->
+              <!-- Vous pouvez générer dynamiquement ces options en utilisant JavaScript -->
+            </select>
+            
+          </div>
+        <div id="listings" class="listings"></div>
+        
+    </div>
+
+     <div id="map" class="map"></div> 
+  
+  <script>
+    
+
+    mapboxgl.accessToken = 'pk.eyJ1IjoidGhzYW56IiwiYSI6ImNsMnJkbG9mejBhZWUzaXJ0ODI5bTE3NWgifQ._k1gxzwAAk6DJHpz_Vg6RQ';
+
+    // Custom SVG code for green circle marker
+    const greenCircleSVG = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#00853e" width="24" height="24">
+        <circle cx="12" cy="12" r="6" />
+    </svg>
+    `;
+
+    // Fonction pour récupérer les données d'Airtable
+    async function fetchDataFromAirtable() {
+        const airtableApiKey = 'keyzlH9cWFXMsn4zy';
+        const airtableBaseId = 'appedeVTCWnHkslDc';
+        const tableName = 'Spaces'; // Remplacez 'Spaces' par le nom de votre table Airtable
+
+        const url = `https://api.airtable.com/v0/${airtableBaseId}/${tableName}?api_key=${airtableApiKey}`;
+        
+    try {
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error fetching data from Airtable:', error);
+        }
+}
+
+    // Fonction pour construire la liste des emplacements dans la barre latérale
+    function buildLocationList(geojson) {
+      const listings = document.getElementById('listings');
+      const locationCount = document.getElementById('locationCount'); // Récupération de l'élément ajouté
+
+      const countriesFilter = document.getElementById('filterByCountry');
+      const uniqueCountries = getUniqueCountries(geojson.features);
+   
+    console.log(listings)
+        // Tri des pays par ordre alphabétique
+        uniqueCountries.sort();
+
+        // Générer les options du menu déroulant en fonction des pays uniques
+        uniqueCountries.forEach((country) => {
+            const option = document.createElement('option');
+            option.value = country;
+            option.textContent = country;
+            countriesFilter.appendChild(option);
+        });
+
+        // Fonction pour filtrer les données GeoJSON en fonction du pays sélectionné
+        function filterGeoJSONByCountry(geojson, country) {
+            if (!country) {
+            // Si aucun pays n'est sélectionné, renvoyer toutes les données
+            return geojson;
+            }
+        
+            // Filtrer les données en fonction du pays sélectionné
+                const filteredFeatures = geojson.features.filter((store) => store.properties.Country === country);
+                return { type: 'FeatureCollection', features: filteredFeatures };
+            }
+   
+        // Événement pour détecter les changements de sélection dans le menu déroulant
+        countriesFilter.addEventListener('change', function () {
+            const selectedCountry = this.value;
+            const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
+
+        // Mettre à jour la liste des emplacements et les marqueurs en fonction des données filtrées
+        updateListing(filteredGeoJSON);
+        addMarkers(filteredGeoJSON);
+        });
+
+        // Afficher tous les espaces au chargement initial
+        updateListing(geojson);
+        addMarkers(geojson);
+        geojson.features.forEach((store) => {
+            /* Add a new listing section to the sidebar. */
+            const listing = listings.appendChild(document.createElement('div'));
+            /* Assign a unique `id` to the listing. */
+            listing.id = `listing-${store.properties.id}`;
+            /* Assign the `item` class to each listing for styling. */
+            listing.className = 'item';
+
+            /* Add the link to the individual listing created above. */
+            const link = listing.appendChild(document.createElement('a'));
+            link.href = '#';
+            link.className = 'title';
+            link.id = `link-${store.properties.id}`;
+            link.innerHTML = `${store.properties.name}`;
+
+            link.addEventListener('click', function () {
+            flyToStore(store); // Appel de la fonction pour déplacer la carte à l'emplacement du magasin
+            createPopUp(store); // Appel de la fonction pour afficher la pop-up du magasin
+
+            const activeItem = document.querySelector('.active');
+            e.stopPropagation();
+
+            if (activeItem) {
+                activeItem.classList.remove('active');
+            }
+            
+            this.parentNode.classList.add('active');
+            });
+
+            /* Add details to the individual listing. */
+            const details = listing.appendChild(document.createElement('div'));
+            details.innerHTML = `${store.properties.City} - ${store.properties.Location}`;
+            if (store.properties.phone) {
+            details.innerHTML += ` &middot; ${store.properties.phoneFormatted}`;
+            }
+        
+                      // Afficher le nombre de lieux dans l'élément
+            locationCount.textContent = `${filteredGeoJSON.features.length} locations`;
+
+
+        });
+        }
+
+    // Fonction pour filtrer les données GeoJSON en fonction du pays sélectionné
+    function filterGeoJSONByCountry(geojson, country) {
+        if (!country) {
+            // Si aucun pays n'est sélectionné, renvoyer toutes les données
+            return geojson;
+        }
+
+    // Filtrer les données en fonction du pays sélectionné
+    const filteredFeatures = geojson.features.filter((store) => store.properties.Country === country);
+    return { type: 'FeatureCollection', features: filteredFeatures };
+    }
+
+    function updateListing(geojson) {
+        const listings = document.getElementById('listings');
+        listings.innerHTML = ''; // Vider le listing actuel
+
+        const countriesFilter = document.getElementById('filterByCountry');
+        const selectedCountry = countriesFilter.value; // Récupérer la valeur du pays sélectionné
+
+        const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
+
+
+        // Afficher un message si aucun emplacement n'est disponible pour le pays sélectionné
+        if (filteredGeoJSON.features.length === 0) {
+            listings.innerHTML = '<p>No locations found for the selected country.</p>';
+            return;
+        }
+
+        // Générer les éléments de la liste pour chaque emplacement
+        filteredGeoJSON.features.forEach((store) => {
+            /* Add a new listing section to the sidebar. */
+            const listing = listings.appendChild(document.createElement('div'));
+            /* Assign a unique `id` to the listing. */
+            listing.id = `listing-${store.properties.id}`;
+            /* Assign the `item` class to each listing for styling. */
+            listing.className = 'item';
+
+        /* Add the link to the individual listing created above. */
+        const link = listing.appendChild(document.createElement('a'));
+        link.href = '#';
+        link.className = 'title';
+        link.id = `link-${store.properties.id}`;
+        link.innerHTML = `${store.properties.name}`;
+
+        link.addEventListener('click', function () {
+        flyToStore(store); // Appel de la fonction pour déplacer la carte à l'emplacement du magasin
+        createPopUp(store); // Appel de la fonction pour afficher la pop-up du magasin
+
+        const activeItem = document.querySelector('.active');
+        if (activeItem) {
+            activeItem.classList.remove('active');
+        }
+        this.parentNode.classList.add('active');
+    });
+
+    /* Add details to the individual listing. */
+    const details = listing.appendChild(document.createElement('div'));
+    details.innerHTML = `${store.properties.City} - ${store.properties.Location}`;
+    if (store.properties.phone) {
+      details.innerHTML += ` &middot; ${store.properties.phoneFormatted}`;
+    }
+  });
+    }
+
+    // Fonction pour ajouter les marqueurs sur la carte
+    function addMarkers(geojson) {
+        // Supprimer tous les marqueurs existants de la carte
+        const markers = document.getElementsByClassName('marker');
+        while (markers[0]) {
+        markers[0].parentNode.removeChild(markers[0]);
+        }
+
+    /* Pour chaque emplacement dans l'objet GeoJSON ci-dessus : */
+    for (const store of geojson.features) {
+        /* Créer un élément div pour le marqueur. */
+        const el = document.createElement('div');
+        /* Attribuer un `id` unique au marqueur. */
+        el.id = `marker-${store.properties.id}`;
+        /* Attribuer la classe `marker` à chaque marqueur pour le style. */
+        el.className = 'marker';
+
+        // Définir le contenu HTML du marqueur sur l'icône SVG personnalisée
+        el.innerHTML = greenCircleSVG;
+
+        // Créer un marqueur en utilisant l'élément div défini ci-dessus et l'ajouter à la carte.
+        new mapboxgl.Marker(el, { offset: [0, 0] }).setLngLat(store.geometry.coordinates).addTo(map);
+
+        /**
+        * Écouter l'élément et lorsqu'il est cliqué, faire trois choses :
+        * 1. Déplacer la carte à l'emplacement de l'emplacement cliqué
+        * 2. Fermer toutes les autres fenêtres contextuelles et afficher la fenêtre contextuelle pour l'emplacement cliqué
+        * 3. Mettre en surbrillance la liste dans la barre latérale
+        **/
+        el.addEventListener('click', (e) => {
+            // Fermer le popup actuellement ouvert s'il y en a un
+            if (currentPopup) {
+                currentPopup.remove();
+            }
+
+            // Créer un popup pour l'emplacement cliqué et l'afficher
+            const popup = new mapboxgl.Popup({ closeOnClick: false })
+                .setLngLat(store.geometry.coordinates)
+                .setHTML(`
+                <h3>${store.properties.name}</h3>
+                <p> <strong> Location :<strong> ${store.properties.Location}</p>
+                <p> <strong> City : <strong> ${store.properties.City}</p>
+                <p> <strong> Country : <strong> ${store.properties.Country}</p>`)
+                .addTo(map);
+
+            // Mettre à jour la variable currentPopup pour suivre le popup actuellement ouvert
+            currentPopup = popup;
+
+            // Déplacer la carte à l'emplacement
+            flyToStore(store);
+
+            // Mettre en surbrillance la liste dans la barre latérale
+            const activeItem = document.querySelector('.active');
+            if (activeItem) {
+                activeItem.classList.remove('active');
+            }
+            const listing = document.getElementById(`listing-${store.properties.id}`);
+            listing.classList.add('active');
+        });
+    }
+    }
+
+   // Fonction pour trier les données par ordre alphabétique en fonction du nom de l'espace
+   function sortDataAlphabetically(geojson) {
+      geojson.features.sort((a, b) => {
+        const nameA = a.properties.name.toUpperCase(); // Convertir en majuscules pour ignorer la casse
+        const nameB = b.properties.name.toUpperCase();
+        if (nameA < nameB) {
+          return -1;
+        }
+        if (nameA > nameB) {
+          return 1;
+        }
+        return 0;
+      });
+    }
+
+    function flyToStore(store) {
+      map.flyTo({
+        center: store.geometry.coordinates,
+        zoom: 5
+      });
+    }
+
+    function createPopUp(store) {
+      
+        const popUps = document.getElementsByClassName('mapboxgl-popup');
+        if (popUps[0]) popUps[0].remove();
+
+        const popup = new mapboxgl.Popup({ closeOnClick: true })
+          .setLngLat(store.geometry.coordinates)
+          .setHTML(`
+        <h3>${store.properties.name}</h3>
+                <p> <strong> Location :<strong> ${store.properties.Location}</p>
+                <p> <strong> City : <strong> ${store.properties.City}</p>
+                <p> <strong> Country : <strong> ${store.properties.Country}</p>`)
+        .addTo(map);
+    }
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [6.926349, 47.192648],
+      zoom: 4.64,
+      scrollZoom: true
+    });
+   
+    // Fonction pour récupérer la liste unique des pays à partir du GeoJSON
+    function getUniqueCountries(features) {
+    const uniqueCountries = new Set();
+    features.forEach((store) => {
+        uniqueCountries.add(store.properties.Country);
+    });
+    return Array.from(uniqueCountries);
+    }
+
+    map.on('load', async () => {
+      const dataFromAirtable = await fetchDataFromAirtable();
+
+    // Transform Airtable data to GeoJSON format
+         const geojson = {
+        type: 'FeatureCollection',
+        features: dataFromAirtable.records.map(record => ({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [record.fields.longitude, record.fields.latitude]
+          },
+          properties: {
+            id: record.id,
+            name: record.fields.name,
+            City: record.fields.City,
+            Location: record.fields.Location,
+            Country: record.fields.Country
+          }
+        }))
+      };
+
+        // Tri des données par ordre alphabétique
+        sortDataAlphabetically(geojson);
+
+      map.addSource('places', {
+        'type': 'geojson',
+        'data': geojson
+      });
+
+      buildLocationList(geojson);
+
+      map.addControl(new mapboxgl.NavigationControl());
+
+      map.on('click', () => {
+        if (currentPopup) {
+          currentPopup.remove();
+        }
+      });
+
+
+    });
+
+    map.addControl(new mapboxgl.NavigationControl());
+
+
+ </script>
+ 
+</body>
+</html>
