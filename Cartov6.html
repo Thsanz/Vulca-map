@@ -20,14 +20,14 @@
     }
 
     .sidebar {
-      position: absolute;
-      width: 33.3333%;
-      height: 100%;
-      top: 0;
-      left: 0;
-      overflow: hidden;
-      border-right: 1px solid rgba(0, 0, 0, 0.25);
-    }
+        position: absolute;
+        width: 33.3333%;
+        height: 100%; /* Définir la hauteur en fonction de la hauteur de la fenêtre */
+        top: 0;
+        left: 0;
+        overflow: hidden;
+        border-right: 1px solid rgba(0, 0, 0, 0.25);
+        }
 
     .map {
       position: absolute;
@@ -59,16 +59,18 @@
       border-bottom: 1px solid #eee;
       min-height: 60px;
       line-height: 60px;
-      padding: 0 10px;
+      padding: 20px 2px;
       background-color: #00853e;
       color: #fff;
+     margin-bottom: 20px; /* Ajouter une marge en bas pour l'espace entre l'élément suivant */
     }
 
     .listings {
-      height: 100%;
-      overflow: auto;
-      padding-bottom: 60px;
+        height: calc(100% - 60px); /* Hauteur maximale en prenant en compte la hauteur de l'en-tête */
+        overflow-y: auto; /* Ajouter un défilement vertical si nécessaire */
+        padding-bottom: 60px;
     }
+
 
     .listings .item {
       display: block;
