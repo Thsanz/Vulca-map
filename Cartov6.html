@@ -214,32 +214,46 @@
     </svg>
     `;
 
-    // Fonction pour récupérer les données d'Airtable
-    async function fetchDataFromAirtable() {
-        const airtableApiKey = 'keyzlH9cWFXMsn4zy';
-        const airtableBaseId = 'appedeVTCWnHkslDc';
-        const tableName = 'Spaces'; // Remplacez 'Spaces' par le nom de votre table Airtable
+    async function fetchAllDataFromAirtable() {
+    const airtableApiKey = 'keyzlH9cWFXMsn4zy';
+    const airtableBaseId = 'appedeVTCWnHkslDc';
+    const tableName = 'Spaces';
+    const maxRecords = 500; // Limite par demande
+    let offset = null;
+    let allRecords = [];
 
-        const url = `https://api.airtable.com/v0/${airtableBaseId}/${tableName}?api_key=${airtableApiKey}`;
-        
-    try {
+    
+    while (true) {
+        const url = `https://api.airtable.com/v0/${airtableBaseId}/${tableName}?maxRecords=${maxRecords}&offset=${offset || ''}&api_key=${airtableApiKey}`;
+
+        try {
             const response = await fetch(url);
             const data = await response.json();
-            return data;
+            allRecords = allRecords.concat(data.records);
+
+            if (!data.offset) {
+                break;
+            }
+
+            offset = data.offset;
         } catch (error) {
             console.error('Error fetching data from Airtable:', error);
+            break;
         }
-}
+    }
+    return allRecords;
 
+}
     // Fonction pour construire la liste des emplacements dans la barre latérale
     function buildLocationList(geojson) {
       const listings = document.getElementById('listings');
-      const locationCount = document.getElementById('locationCount'); // Récupération de l'élément ajouté
+      const locationCount = document.getElementById('locationCount');
+        locationCount.textContent = `${geojson.features.length} spaces`;
 
       const countriesFilter = document.getElementById('filterByCountry');
       const uniqueCountries = getUniqueCountries(geojson.features);
    
-    console.log(listings)
+    console.log()
         // Tri des pays par ordre alphabétique
         uniqueCountries.sort();
 
@@ -251,26 +265,26 @@
             countriesFilter.appendChild(option);
         });
 
-        // Fonction pour filtrer les données GeoJSON en fonction du pays sélectionné
-        function filterGeoJSONByCountry(geojson, country) {
-            if (!country) {
-            // Si aucun pays n'est sélectionné, renvoyer toutes les données
-            return geojson;
-            }
-        
-            // Filtrer les données en fonction du pays sélectionné
-                const filteredFeatures = geojson.features.filter((store) => store.properties.Country === country);
-                return { type: 'FeatureCollection', features: filteredFeatures };
-            }
-   
-        // Événement pour détecter les changements de sélection dans le menu déroulant
-        countriesFilter.addEventListener('change', function () {
-            const selectedCountry = this.value;
-\
-        // Mettre à jour la liste des emplacements et les marqueurs en fonction des données filtrées
-        updateListing(filteredGeoJSON);
-        addMarkers(filteredGeoJSON);
-        });
+// Fonction pour filtrer les données GeoJSON en fonction du pays sélectionné
+const filterGeoJSONByCountry = (geojson, country) => {
+    if (!country) {
+        return geojson;
+    }
+
+    const filteredFeatures = geojson.features.filter(store => store.properties.Country === country);
+    return { type: 'FeatureCollection', features: filteredFeatures };
+};
+
+// Événement pour détecter les changements de sélection dans le menu déroulant
+countriesFilter.addEventListener('change', () => {
+    const selectedCountry = countriesFilter.value;
+    const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
+
+    // Mettre à jour la liste des emplacements et les marqueurs en fonction des données filtrées
+    updateListing(filteredGeoJSON);
+    addMarkers(filteredGeoJSON);
+});
+
 
         // Afficher tous les espaces au chargement initial
         updateListing(geojson);
@@ -318,6 +332,17 @@
         });
         }
 
+    // Fonction pour filtrer les données GeoJSON en fonction du pays sélectionné
+    function filterGeoJSONByCountry(geojson, country) {
+        if (!country) {
+            // Si aucun pays n'est sélectionné, renvoyer toutes les données
+            return geojson;
+        }
+
+    // Filtrer les données en fonction du pays sélectionné
+    const filteredFeatures = geojson.features.filter((store) => store.properties.Country === country);
+    return { type: 'FeatureCollection', features: filteredFeatures };
+    }
 
     function updateListing(geojson) {
         const listings = document.getElementById('listings');
@@ -326,7 +351,7 @@
         const countriesFilter = document.getElementById('filterByCountry');
         const selectedCountry = countriesFilter.value; // Récupérer la valeur du pays sélectionné
 
-       // const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
+        const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
 
 
         // Afficher un message si aucun emplacement n'est disponible pour le pays sélectionné
@@ -488,49 +513,45 @@
     }
 
     map.on('load', async () => {
-      const dataFromAirtable = await fetchDataFromAirtable();
+    const allDataFromAirtable = await fetchAllDataFromAirtable();
 
     // Transform Airtable data to GeoJSON format
-         const geojson = {
+    const geojson = {
         type: 'FeatureCollection',
-        features: dataFromAirtable.records.map(record => ({
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [record.fields.longitude, record.fields.latitude]
-          },
-          properties: {
-            id: record.id,
-            name: record.fields.name,
-            City: record.fields.City,
-            Location: record.fields.Location,
-            Country: record.fields.Country
-          }
+        features: allDataFromAirtable.map(record => ({
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [record.fields.longitude, record.fields.latitude]
+            },
+            properties: {
+                id: record.id,
+                name: record.fields.name,
+                City: record.fields.City,
+                Location: record.fields.Location,
+                Country: record.fields.Country
+            }
         }))
-      };
+    };
 
-        // Tri des données par ordre alphabétique
-        sortDataAlphabetically(geojson);
+    // Sort data alphabetically
+    sortDataAlphabetically(geojson);
 
-      map.addSource('places', {
+    map.addSource('places', {
         'type': 'geojson',
         'data': geojson
-      });
-
-      buildLocationList(geojson);
-
-      map.addControl(new mapboxgl.NavigationControl());
-
-      map.on('click', () => {
-        if (currentPopup) {
-          currentPopup.remove();
-        }
-      });
-
-
     });
 
+    buildLocationList(geojson);
+
     map.addControl(new mapboxgl.NavigationControl());
+
+    map.on('click', () => {
+        if (currentPopup) {
+            currentPopup.remove();
+        }
+    });
+});
 
 
  </script>
