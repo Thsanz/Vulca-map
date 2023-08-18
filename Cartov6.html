@@ -266,8 +266,7 @@
         // Événement pour détecter les changements de sélection dans le menu déroulant
         countriesFilter.addEventListener('change', function () {
             const selectedCountry = this.value;
-            const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
-
+\
         // Mettre à jour la liste des emplacements et les marqueurs en fonction des données filtrées
         updateListing(filteredGeoJSON);
         addMarkers(filteredGeoJSON);
@@ -319,17 +318,6 @@
         });
         }
 
-    // Fonction pour filtrer les données GeoJSON en fonction du pays sélectionné
-    function filterGeoJSONByCountry(geojson, country) {
-        if (!country) {
-            // Si aucun pays n'est sélectionné, renvoyer toutes les données
-            return geojson;
-        }
-
-    // Filtrer les données en fonction du pays sélectionné
-    const filteredFeatures = geojson.features.filter((store) => store.properties.Country === country);
-    return { type: 'FeatureCollection', features: filteredFeatures };
-    }
 
     function updateListing(geojson) {
         const listings = document.getElementById('listings');
@@ -338,7 +326,7 @@
         const countriesFilter = document.getElementById('filterByCountry');
         const selectedCountry = countriesFilter.value; // Récupérer la valeur du pays sélectionné
 
-        const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
+       // const filteredGeoJSON = filterGeoJSONByCountry(geojson, selectedCountry);
 
 
         // Afficher un message si aucun emplacement n'est disponible pour le pays sélectionné
