@@ -307,19 +307,16 @@ countriesFilter.addEventListener('change', () => {
             link.innerHTML = `${store.properties.name}`;
 
             link.addEventListener('click', function () {
-            flyToStore(store); // Appel de la fonction pour déplacer la carte à l'emplacement du magasin
-            createPopUp(store); // Appel de la fonction pour afficher la pop-up du magasin
+                flyToStore(store); // Appel de la fonction pour déplacer la carte à l'emplacement du magasin
+                createPopUp(store); // Appel de la fonction pour afficher la pop-up du magasin
 
-            const activeItem = document.querySelector('.active');
-            e.stopPropagation();
+                const activeItem = document.querySelector('.active');
+                if (activeItem) {
+                    activeItem.classList.remove('active');
+                }
 
-            if (activeItem) {
-                activeItem.classList.remove('active');
-            }
-            
-            this.parentNode.classList.add('active');
+                this.parentNode.classList.add('active');
             });
-
             /* Add details to the individual listing. */
             const details = listing.appendChild(document.createElement('div'));
             details.innerHTML = `${store.properties.City} - ${store.properties.Location}`;
